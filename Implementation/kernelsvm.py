@@ -373,14 +373,16 @@ def testClassifier(Xs,Ts,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
         print "Bias:",b
     ## Do classification test.
     good = True
+    missed = 0
     for i in range(len(Xs)):
         c = classify(Xs[i],Xs,Ts,Ls,b,K=K)
         if c != Ts[i]:
+            missed += 1
             if verbose:
                 print "Misclassification: input %s, output %d, expected %d" %\
                       (Xs[i],c,Ts[i])
             good = False
-    return good
+    return good, missed
 
 
 ##--------------------------------------------------------------------------
@@ -443,7 +445,10 @@ print "\n\nAttempting to generate LMs for training test using rbf kernel with si
 status,Ls=makeLambdas(Xs,Ts,C,K=rbf2)
 if status == 'optimal':
     b=makeB(Xs,Ts,C,Ls,K=rbf2)
-    if testClassifier(Xs,Ts,C,Ls,b,K=rbf2):
+    passed, missed = testClassifier(Xs,Ts,C,Ls,b,K=rbf2)
+    accuracy=((float(num_points)-missed)/float(num_points))*100.0
+    if passed:
         print "  Check PASSED"
     else:
         print "  Check FAILED: Classifier does not work corectly on training inputs"
+print "Total of %d misclassification. Overall %.2f%% accuracy" %(missed, accuracy)
