@@ -210,21 +210,6 @@
 ##
 ##      --------------------------------------------------------------------
 ##
-##      polyKernel(x,y,p) --
-##                  Polynomial kernel (x.y + 1)^p.
-##
-##              Arguments:
-##
-##                 x,y  -- n-element vectors.
-##
-##                 p    -- Exponent of the poly.
-##
-##              Returns:
-##
-##                 Scalar value of kernel for the 2 input vectors.
-##
-##      --------------------------------------------------------------------
-##
 ##      rbfKernel(x,y,s2) --
 ##                  Radial basis function kernel exp(-||x-y||^2/2*sigma^2).
 ##
@@ -239,20 +224,6 @@
 ##
 ##                 Scalar value of kernel for the 2 input vectors.
 ##
-##      --------------------------------------------------------------------
-##
-##      linKernel(x,y) --
-##                  Linear (standard dot-product) kernel.  Supplied to
-##                  allow the kernel-based SVM to work like the non-kernel
-##                  based linsvm.py on linear problems like AND.
-##
-##              Arguments:
-##
-##                 x,y  -- n-element vectors.
-##
-##              Returns:
-##
-##                 Scalar value of kernel for the 2 input vectors.
 ##
 ##  ------------------------------------------------------------------------
 ##
@@ -290,19 +261,9 @@
 
 from cvxopt import matrix,solvers
 from math import exp
+import numpy as np
+from numpy import array
 
-
-##--------------------------------------------------------------------------
-##
-##  rbfKernel
-##
-##  Return the radial basis function kernel exp(-||x-y||^2/2*sigma^2).  Note
-##  default variance  (sigma2) = 1.0 (= sigma^2, where sigma =
-##  standard deviation).
-##
-##  Typical problems not too sensitive to size of variance, but note, it
-##  must be +ve.
-##
 
 def rbfKernel(v1,v2,sigma2=1.0):
     assert len(v1) == len(v2)
@@ -310,153 +271,49 @@ def rbfKernel(v1,v2,sigma2=1.0):
     mag2 = sum(map(lambda x,y: (x-y)*(x-y), v1,v2))  ## Squared mag of diff.
     return exp(-mag2/(2.0*sigma2))
 
-##--------------------------------------------------------------------------
-##
-##  makeLambdas
-##
-##  Use the qp solver from the cvx package to find a list of Lagrange
-##  multipliers (lambdas or L's) for an Xs/Ts problem, where Xs is a list
-##  of input vectors (themselves represented as simple lists) and Ts a list
-##  of desired outputs.
-##
-##
-##  Note that we are trying to solve the problem:
-##
-##      Maximize:
-##
-##        W(L) =  \sum_i L_i
-##                - 1/2 sum_i sum_j L_i * L_j * t_i * t_j * K(x_i,x_j)
-##
-##      subject to:  \sum_i t_i L_i  =  0   and   L_i >= 0.
-##
-##
-##  but the "standard" quadratic programming problem is subtly different,
-##  it attempts to *minimize* the following quadratic form:
-##
-##        f(y) = 1/2 y^t P y  +  q^t y
-##
-##  subject to:  G L <= h   and   A y = b, where P is an n x n 
-##  symmetric matrix, G is an n x n matrix, A is a 1 x n
-##  (row) vector, q is an n x 1 (column) vector, as are h and y.
-##  N.B., Vector y is the solution being searched for.
-##
-##  To turn the W(l) constrained maximazation into a constrained
-##  minimization of f, it suffices to set:
-##
-##          [-1.0]
-##             .
-##             .
-##      q = [-1.0]      (n element column vector).
-##          [-1.0]
-##             .
-##             .
-##          [-1.0]
-##
-##
-##          [-1.0,  0.0  ....  0.0]
-##          [ 0.0, -1.0           ]
-##          [             .       ]   (n x n matrix with -1.0 on
-##      G = [             .       ]    main diagonal and 0.0's
-##          [            0.0,     ]    everywhere else. i.e -I) 
-##          [           -1.0,  0.0]
-##          [            0.0, -1.0]
-##
-##
-##
-##      A = [ t_1, t_2, t_3, ... t_n],  a row vector with n elements
-##                                      made using the t list input.
-##
-##
-##      h = n element column vector of 0.0's.
-##
-##      b = [0.0], i.e., a 1 x 1 matrix containing 0.0.
-##
-##
-##          [                    ]   (n x n matrix with elements 
-##      P = [ t_i t_j K(x_i x_j) ]    t_i t_j x_i x_j).
-##          [                    ]
-##
-##
-##  The solution (if one exists) is returned by the "qp" solver as
-##  a vector of elements.  The solver actually returns a dictionary
-##  of values, this contains lots of information about the solution,
-##  quality, etc.  But, from the point of view of this routine the
-##  important part is the vector of "l" values, which is accessed
-##  under the 'x' key in the returned dictionary.
-##
-##  N.B.  All the routines in the Cxvopt library are very sensitive to
-##  the data types of their arguments.  In particular, all vectors,
-##  matrices, etc., passed to "qp" must have elements that are
-##  doubles.
 
-def makeLambdas(Xs,Ts,K=rbfKernel):
+def makeLambdas(Xs,Ts,C,K=rbfKernel):
     "Solve constrained maximaization problem and return list of l's."
     P = makeP(Xs,Ts,K)            ## Build the P matrix.
     n = len(Ts)
     q = matrix(-1.0,(n,1))        ## This builds an n-element column 
                                   ## vector of -1.0's (note the double-
                                   ## precision constant).
-    h = matrix(0.0,(n,1))         ## n-element column vector of zeros.
+    
+    ## 2n x n column vector where the first n contains 0's while the
+    ## second half contains C    
+    h = matrix(0.0,(2*n,1))       
+    for i in range((len(h)/2), len(h)):
+        h[i]=C
 
-    G = matrix(0.0,(n,n))         ## These lines generate G, an 
-    G[::(n+1)] = -1.0             ## n x n matrix with -1.0's on its
-                                  ## main diagonal.
+    ## Stack two n x n matrices on top of one another
+    ## Top matrix contains diagonal of -1's and bottom contains 1's 
+    G1 = matrix(0.0,(n,n))        
+    G1[::(n+1)] = -1.0                                               
+    G2 = matrix(0.0,(n,n))        
+    G2[::(n+1)] = 1.0             
+
+    G_a = array(G1)
+    G_b = array(G2)
+    GG = np.vstack((G_a,G_b))
+    
+    G = matrix(GG)
+    
     A = matrix(Ts,(1,n),tc='d')   ## A is an n-element row vector of 
                                   ## training outputs.
-                                
-    ##
-    ## Now call "qp". Details of the parameters to the call can be
-    ## found in the online cvxopt documentation.
-    ##
+      
     r = solvers.qp(P,q,G,h,A,matrix(0.0))  ## "qp" returns a dict, r.
-    ##
-    ## print r                     ## Dump entire result dictionary
-    ##                             ## to terminal.
-    ##
-    ## Return results. Return a tuple, (Status,Ls).  First element is
-    ## a string, which will be "optimal" if a solution has been found.
-    ## The second element is a list of Lagrange multipliers for the problem,
-    ## rounded to six decimal digits to remove algorithm noise.
-    ##
+    
     Ls = [round(l,6) for l in list(r['x'])] ## "L's" are under the 'x' key.
     return (r['status'],Ls)
 
 
-##--------------------------------------------------------------------------
-##
-##  Find the bias for this kernel-based classifier.
-##
-##  The bias can be generated from any support vector Xs[n]:
-##
-##
-##      b = Ts[n] - sum_i Ls[i] * Ts[i] * K(Xs[i],Xs[n])
-##
-##  because support vectors lie on the margin hyperplanes, hence
-##  Ts[n]*y(Xs[n]) == 1 provided that Ls[n] != 0, where y(x) is the
-##  discriminant function.
-##
-##                         Ts[n]*y(Xs[n]) == 1
-##                               y(Xs[n]) == Ts[n]   (Ts[n]*Ts[n] == 1)
-##                   dot(Ws,Xs)*Xs[n] + b == Ts[n]   (def of y(x))
-##  (sum_i Ls[i]*Ts[i]*K(Xs[i],Xs[n])) + b == Ts[n]  (def of Ws -- weights)
-##
-##
-##  It's numerically more stable to average over all support vectors.
-##
-##  N.B.  If no multipliers are supplied, this routine will call
-##  makeLambdas to generate them.  If this fails, it will throw an
-##  exception.
-##
-##  If no kernel is supplied, this routine will use the default
-##  polynomial kernel  K(x,y) = (dot(x,y) + 1.0)^2.
-##
-##
 
-def makeB(Xs,Ts,Ls=None,K=rbfKernel):
+def makeB(Xs,Ts,C,Ls=None,K=rbfKernel):
     "Generate the bias given Xs, Ts and (optionally) Ls and K"
     ## No Lagrange multipliers supplied, generate them.
     if Ls == None:
-        status,Ls = makeLambdas(Xs,Ts)
+        status,Ls = makeLambdas(Xs,Ts,C)
         ## If Ls generation failed (non-seperable problem) throw exception
         if status != "optimal": raise Exception("Can't find Lambdas")
     ## Calculate bias as average over all support vectors (non-zero
@@ -464,7 +321,7 @@ def makeB(Xs,Ts,Ls=None,K=rbfKernel):
     sv_count = 0
     b_sum = 0.0
     for n in range(len(Ts)):
-        if Ls[n] >= 1e-10:   ## 1e-10 for numerical stability.
+        if Ls[n] >= 1e-10 and Ls[n] < C:   ## 1e-10 for numerical stability.
             sv_count += 1
             b_sum += Ts[n]
             for i in range(len(Ts)):
@@ -474,26 +331,11 @@ def makeB(Xs,Ts,Ls=None,K=rbfKernel):
     return b_sum/sv_count
 
 
-##--------------------------------------------------------------------------
-##
-##  Classify a single input vector using a trained nonlinear SVM.
-##
-##  If Lagrange multipliers not supplied, will build them from the
-##  training set.  Ditto for bias.  By default uses a quadratic polynomial
-##  kernel.  Takes a parameter, verbose, that prints out the input,
-##  activation level and classification if set to True.
-##
-##  If no kernel is supplied, this routine will use the default
-##  polynomial kernel  K(x,y) = (dot(x,y) + 1.0)^2.
-##
-##
-
-
 def classify(x,Xs,Ts,Ls=None,b=None,K=rbfKernel,verbose=True):
     "Classify an input x into {-1,+1} given support vectors, outputs and L." 
     ## No Lagrange multipliers supplied, generate them.
     if Ls == None:
-        status,Ls = makeLambdas(Xs,Ts)
+        status,Ls = makeLambdas(Xs,Ts,C)
         ## If Ls generation failed (non-seperable problem) throw exception
         if status != "optimal": raise Exception("Can't find Lambdas")
     ## Calculate bias as average over all support vectors (non-zero
@@ -515,35 +357,19 @@ def classify(x,Xs,Ts,Ls=None,b=None,K=rbfKernel,verbose=True):
     else: return 0 
 
 
-##--------------------------------------------------------------------------
-##
-##  Test a trained nonlinear SVM on all vectors from its training set.  The
-##  kernel is quadratic polynomial by default.
-##
-##  If Lagrange multipliers not supplied, will build them from the
-##  training set.  Ditto for bias.  By default uses a quadratic polynomial
-##  kernel.  Takes a parameter, verbose, that prints out the input,
-##  activation level and classification if set to True.
-##
-##  If no kernel is supplied, this routine will use the default
-##  polynomial kernel  K(x,y) = (dot(x,y) + 1.0)^2.
-##
-##
-
-
-def testClassifier(Xs,Ts,Ls=None,b=None,K=rbfKernel,verbose=True):
+def testClassifier(Xs,Ts,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
     "Test a classifier specifed by Lagrange mults, bias and kernel on all Xs/Ts pairs."
     assert len(Xs) == len(Ts)
     ## No Ls supplied, generate them.
     if Ls == None:
-        status,Ls = makeLambdas(Xs,Ts,K)
+        status,Ls = makeLambdas(Xs,Ts,C,K)
         ## If Ls generation failed (non-seperable problem) throw exception
         if status != "optimal": raise Exception("Can't find Lambdas")
         print "Lagrange multipliers:",Ls
     ## Calculate bias as average over all support vectors (non-zero
     ## Lagrange multipliers.
     if b == None:
-        b = makeB(Xs,Ts,Ls,K)
+        b = makeB(Xs,Ts,C,Ls,K)
         print "Bias:",b
     ## Do classification test.
     good = True
@@ -607,6 +433,17 @@ with open('training-dataset-aut-2016.txt') as f:
 ## Place x1 and x2 into the single Xs list
 num_points = len(x1)
 Xs = num_points*[None]     ## training set
-for i in range():
+for i in range(num_points):
     Xs[i]=[x1[i],x2[i]]
     
+## Test training set
+#
+C = 1
+print "\n\nAttempting to generate LMs for training test using rbf kernel with sigma^2=0.15"
+status,Ls=makeLambdas(Xs,Ts,C,K=rbf2)
+if status == 'optimal':
+    b=makeB(Xs,Ts,C,Ls,K=rbf2)
+    if testClassifier(Xs,Ts,C,Ls,b,K=rbf2):
+        print "  Check PASSED"
+    else:
+        print "  Check FAILED: Classifier does not work corectly on training inputs"
