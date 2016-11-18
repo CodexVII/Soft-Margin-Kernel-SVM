@@ -309,7 +309,7 @@ def makeLambdas(Xs,Ts,C,K=rbfKernel):
 
 
 
-def makeB(Xs,Ts,C,Ls=None,K=rbfKernel):
+def makeB(Xs,Ts,C=1,Ls=None,K=rbfKernel):
     "Generate the bias given Xs, Ts and (optionally) Ls and K"
     ## No Lagrange multipliers supplied, generate them.
     if Ls == None:
@@ -331,7 +331,7 @@ def makeB(Xs,Ts,C,Ls=None,K=rbfKernel):
     return b_sum/sv_count
 
 
-def classify(x,Xs,Ts,Ls=None,b=None,K=rbfKernel,verbose=True):
+def classify(x,Xs,Ts,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
     "Classify an input x into {-1,+1} given support vectors, outputs and L." 
     ## No Lagrange multipliers supplied, generate them.
     if Ls == None:
@@ -340,7 +340,7 @@ def classify(x,Xs,Ts,Ls=None,b=None,K=rbfKernel,verbose=True):
         if status != "optimal": raise Exception("Can't find Lambdas")
     ## Calculate bias as average over all support vectors (non-zero
     ## Lagrange multipliers.
-    if b == None:  b = makeB(Xs,Ts,Ls,K)
+    if b == None:  b = makeB(Xs,Ts,C,Ls,K)
     ## Do classification.  y is the "activation level".
     y = b
     for n in range(len(Ts)):
@@ -375,7 +375,7 @@ def testClassifier(Xs,Ts,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
     good = True
     missed = 0
     for i in range(len(Xs)):
-        c = classify(Xs[i],Xs,Ts,Ls,b,K=K)
+        c = classify(Xs[i],Xs,Ts,C,Ls,b,K=K)
         if c != Ts[i]:
             missed += 1
             if verbose:
@@ -438,17 +438,77 @@ Xs = num_points*[None]     ## training set
 for i in range(num_points):
     Xs[i]=[x1[i],x2[i]]
     
-## Test training set
+## Test training set with C=1 sigma^2=0.15
 #
-C = 1
-print "\n\nAttempting to generate LMs for training test using rbf kernel with sigma^2=0.15"
-status,Ls=makeLambdas(Xs,Ts,C,K=rbf2)
+C1 = 1
+print "\n\nAttempting to generate LMs for training test using rbf kernel with C=1 sigma^2=0.15"
+status,Ls1=makeLambdas(Xs,Ts,C1,K=rbf2)
 if status == 'optimal':
-    b=makeB(Xs,Ts,C,Ls,K=rbf2)
-    passed, missed = testClassifier(Xs,Ts,C,Ls,b,K=rbf2)
+    b=makeB(Xs,Ts,C1,Ls1,K=rbf2)
+    passed, missed = testClassifier(Xs,Ts,C1,Ls1,b,K=rbf2)
     accuracy=((float(num_points)-missed)/float(num_points))*100.0
     if passed:
         print "  Check PASSED"
     else:
         print "  Check FAILED: Classifier does not work corectly on training inputs"
+print "Total of %d misclassification. Overall %.2f%% accuracy" %(missed, accuracy)
+
+    
+# Test training set with C=1e6 sigma^2=0.15
+
+C2 = 1e6
+print "\n\nAttempting to generate LMs for training test using rbf kernel with C=1e6 sigma^2=0.15"
+status,Ls2=makeLambdas(Xs,Ts,C2,K=rbf2)
+if status == 'optimal':
+    b=makeB(Xs,Ts,C2,Ls2,K=rbf2)
+    passed, missed = testClassifier(Xs,Ts,C2,Ls2,b,K=rbf2)
+    accuracy=((float(num_points)-missed)/float(num_points))*100.0
+    if passed:
+        print "  Check PASSED"
+    else:
+        print "  Check FAILED: Classifier does not work corectly on training inputs"
+print "Total of %d misclassification. Overall %.2f%% accuracy" %(missed, accuracy)
+
+
+##--------------------------------------------------------------------------
+##
+##  Working with the testing set
+##  Reuse the corresponding L's and C's from the training phase
+##
+##--------------------------------------------------------------------------
+##
+x1 = []     ## stores x
+x2 = []     ## stores y
+Ts = []     ## desired output of training set
+with open('testing-dataset-aut-2016.txt') as f:
+    for line in f:
+        data = line.split()
+        x1.append(float(data[0]))
+        x2.append(float(data[1]))
+        Ts.append(int(data[2]))
+        
+
+## Place x1 and x2 into the single Xs list
+num_points = len(x1)
+Xs = num_points*[None]     ## training set
+for i in range(num_points):
+    Xs[i]=[x1[i],x2[i]]
+    
+## Test set with C=1 sigma^2=0.15
+#
+print "\n\nAttempting to generate LMs for test set using rbf kernel with C=1 sigma^2=0.15"
+passed, missed = testClassifier(Xs,Ts,C1,Ls1,b,K=rbf2)
+accuracy=((float(num_points)-missed)/float(num_points))*100.0
+if passed:
+    print "  Check PASSED"
+print "Total of %d misclassification. Overall %.2f%% accuracy" %(missed, accuracy)
+
+    
+## Test set with C=1e6 sigma^2=0.15
+#
+print "\n\nAttempting to generate LMs for test set using rbf kernel with C=1e6 sigma^2=0.15"
+passed, missed = testClassifier(Xs,Ts,C2,Ls2,b,K=rbf2)
+accuracy=((float(num_points)-missed)/float(num_points))*100.0
+if passed:
+    print "  Check PASSED"
 print "Total of %d misclassification. Overall %.2f%% accuracy" %(missed, accuracy)
