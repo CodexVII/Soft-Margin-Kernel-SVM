@@ -374,15 +374,21 @@ def testClassifier(Xs,Ts,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
     ## Do classification test.
     good = True
     missed = 0
+    fn = 0
+    fp = 0
     for i in range(len(Xs)):
         c = classify(Xs[i],Xs,Ts,C,Ls,b,K=K)
         if c != Ts[i]:
             missed += 1
+            if c == 1 and Ts[i] == -1:
+                fp += 1
+            elif c == -1 and Ts[i] == 1:
+                fn += 1
             if verbose:
                 print "Misclassification: input %s, output %d, expected %d" %\
                       (Xs[i],c,Ts[i])
             good = False
-    return good, missed
+    return good, missed, fn, fp
 
 
 ##--------------------------------------------------------------------------
@@ -445,14 +451,15 @@ print "\n\nAttempting to generate LMs for training test using rbf kernel with C=
 status,Ls1=makeLambdas(Xs,Ts,C1,K=rbf2)
 if status == 'optimal':
     b=makeB(Xs,Ts,C1,Ls1,K=rbf2)
-    passed, missed = testClassifier(Xs,Ts,C1,Ls1,b,K=rbf2)
+    passed,missed,fn,fp = testClassifier(Xs,Ts,C1,Ls1,b,K=rbf2)
     accuracy=((float(num_points)-missed)/float(num_points))*100.0
     if passed:
         print "  Check PASSED"
     else:
         print "  Check FAILED: Classifier does not work corectly on training inputs"
-print "Total of %d misclassification. Overall %.2f%% accuracy" %(missed, accuracy)
-
+print "Total of %d misclassification(s)." %(missed)
+print "False Positive(s): %d, False Negative(s): %d" %(fn, fp) 
+print "Overall accuracy %.2f%%" %(accuracy)
     
 # Test training set with C=1e6 sigma^2=0.15
 
@@ -461,14 +468,15 @@ print "\n\nAttempting to generate LMs for training test using rbf kernel with C=
 status,Ls2=makeLambdas(Xs,Ts,C2,K=rbf2)
 if status == 'optimal':
     b=makeB(Xs,Ts,C2,Ls2,K=rbf2)
-    passed, missed = testClassifier(Xs,Ts,C2,Ls2,b,K=rbf2)
+    passed,missed,fn,fp = testClassifier(Xs,Ts,C2,Ls2,b,K=rbf2)
     accuracy=((float(num_points)-missed)/float(num_points))*100.0
     if passed:
         print "  Check PASSED"
     else:
         print "  Check FAILED: Classifier does not work corectly on training inputs"
-print "Total of %d misclassification. Overall %.2f%% accuracy" %(missed, accuracy)
-
+print "Total of %d misclassification(s)." %(missed)
+print "False Positive(s): %d, False Negative(s): %d" %(fn, fp) 
+print "Overall accuracy %.2f%%" %(accuracy)
 
 ##--------------------------------------------------------------------------
 ##
@@ -497,18 +505,22 @@ for i in range(num_points):
 ## Test set with C=1 sigma^2=0.15
 #
 print "\n\nAttempting to generate LMs for test set using rbf kernel with C=1 sigma^2=0.15"
-passed, missed = testClassifier(Xs,Ts,C1,Ls1,b,K=rbf2)
+passed,missed,fn,fp = testClassifier(Xs,Ts,C1,Ls1,b,K=rbf2)
 accuracy=((float(num_points)-missed)/float(num_points))*100.0
 if passed:
     print "  Check PASSED"
-print "Total of %d misclassification. Overall %.2f%% accuracy" %(missed, accuracy)
+print "Total of %d misclassification(s)." %(missed)
+print "False Positive(s): %d, False Negative(s): %d" %(fn, fp) 
+print "Overall accuracy %.2f%%" %(accuracy)
 
     
 ## Test set with C=1e6 sigma^2=0.15
 #
 print "\n\nAttempting to generate LMs for test set using rbf kernel with C=1e6 sigma^2=0.15"
-passed, missed = testClassifier(Xs,Ts,C2,Ls2,b,K=rbf2)
+passed,missed,fn,fp = testClassifier(Xs,Ts,C2,Ls2,b,K=rbf2)
 accuracy=((float(num_points)-missed)/float(num_points))*100.0
 if passed:
     print "  Check PASSED"
-print "Total of %d misclassification. Overall %.2f%% accuracy" %(missed, accuracy)
+print "Total of %d misclassification(s)." %(missed)
+print "False Positive(s): %d, False Negative(s): %d" %(fn, fp) 
+print "Overall accuracy %.2f%%" %(accuracy)
