@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from  matplotlib.pyplot import savefig
 from math import exp
-from numpy import array, shape
+from numpy import array
 from cvxopt import matrix,solvers
 
 def rbfKernel(v1,v2,sigma2=1.0):
@@ -283,8 +284,8 @@ print "Overall accuracy %.2f%%" %(accuracy)
 ## 
 def plotContour(Xs, Ts, C, Ls, b):
     # prepare the x,y coords
-    x = np.arange(-1,3.5,0.005)
-    y = np.arange(-1.5,2.5,0.005)    
+    x = np.arange(-1,3.5,0.001)
+    y = np.arange(-1.5,2.5,0.001)    
     xx,yy = np.meshgrid(x,y)
         
     
@@ -314,7 +315,7 @@ plt.figure()
 plt.scatter(*zip(*pos_ve), color='red')
 plt.scatter(*zip(*neg_ve), color='blue')
 X1,Y1,Z1=plotContour(Xs, Ts, C1, Ls1, b1)
-
+savefig('Training Set C1')
 
 ## Organise testing data to classifications
 pos_ve_t = []     ## stores class 1 data
@@ -327,4 +328,5 @@ for i in range(num_points):
 plt.figure()
 plt.scatter(*zip(*pos_ve_t), color='red')
 plt.scatter(*zip(*neg_ve_t), color='blue')
-plotContour(Xs, Ts, C2, Ls2, b2)
+plotContour(Xs, Ts, C1, Ls1, b1)
+savefig('Testing set C1')
