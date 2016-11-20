@@ -1,14 +1,20 @@
-from cvxopt import matrix,solvers
-from math import exp
 import numpy as np
-from numpy import array
 import matplotlib.pyplot as plt
+from math import exp
+from numpy import array, shape
+from cvxopt import matrix,solvers
 
 def rbfKernel(v1,v2,sigma2=1.0):
     assert len(v1) == len(v2)
     assert sigma2 >= 0.0
     mag2 = sum(map(lambda x,y: (x-y)*(x-y), v1,v2))  ## Squared mag of diff.
     return exp(-mag2/(2.0*sigma2))
+
+## Radial Basis Function with sigma^2=0.15
+##
+def rbf2(x,y):
+    return rbfKernel(x,y,0.15)
+
 
 
 def makeLambdas(Xs,Ts,C,K=rbfKernel):
@@ -70,7 +76,7 @@ def makeB(Xs,Ts,C=1,Ls=None,K=rbfKernel):
     return b_sum/sv_count
 
 
-def classify(x,Xs,Ts,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
+def classify(x,Xs,Ts,C=1,Ls=None,b=None,K=rbf2,verbose=True):
     "Classify an input x into {-1,+1} given support vectors, outputs and L." 
     ## No Lagrange multipliers supplied, generate them.
     if Ls == None:
@@ -149,11 +155,6 @@ def makeP(xs,ts,K):
         for j in range(N):
             P[i,j] = ts[i] * ts[j] * K(xs[i],xs[j])
     return P
-
-## Radial Basis Function with sigma^2=0.15
-##
-def rbf2(x,y):
-    return rbfKernel(x,y,0.15)
 
 
 ##--------------------------------------------------------------------------
@@ -271,19 +272,34 @@ print "Overall accuracy %.2f%%" %(accuracy)
 ##--------------------------------------------------------------------------
 ##
 
+########################################################
 ##
+## To implement figure out what zz is for this problem
+##
+## x = np.arange(-5, 5, 0.5)
+## y = np.arange(-5, 5, 0.5)
+## xx, yy = meshgrid(x, y, sparse=True)
+## z = np.sin(xx**2 + yy**2) / (xx**2 + yy**2)
 ## 
-#classify(Xs[i],Xs,Ts,C,Ls,b,K=K)
-def plotContours(Xs, Ts, C, Ls, b,K=rbfKernel):
-   x=Xs[:0]
-   y=Xs[:1]
-   classed=[]
-   for i in range(len(x)):
-       for j in range(len(y)):
-           classed[i,j].append(classify(Xs[j], Xs, Ts, C, Ls, b))
-   
-   plt.figure()
-   plt.contour(x,y,classed)   
+def plotContour(Xs, Ts, C, Ls, b):
+    # prepare the x,y coords
+    x = np.arange(-1,3.5,0.005)
+    y = np.arange(-1.5,2.5,0.005)    
+    xx,yy = np.meshgrid(x,y)
+        
+    
+    rows = len(y)
+    columns = len(x)
+    # fill up z which classifies each xx and yy
+    z = np.ndarray(shape=(rows,columns)) 
+    
+    
+    for i in range(columns):
+        for j in range(rows):
+            z[j,i] = classify(array([x[i],y[j]]).tolist(), Xs, Ts, C, Ls, b, verbose=False)
+  
+    plt.contour(xx,yy,z)
+    return xx,yy,z
    
 ## Organise training data to classifications
 pos_ve = []     ## stores class 1 data
@@ -297,7 +313,7 @@ for i in range(num_points):
 plt.figure()
 plt.scatter(*zip(*pos_ve), color='red')
 plt.scatter(*zip(*neg_ve), color='blue')
-plotContours(Xs, Ts, C1, Ls1, b1, K=rbf2 )
+X1,Y1,Z1=plotContour(Xs, Ts, C1, Ls1, b1)
 
 
 ## Organise testing data to classifications
@@ -311,5 +327,4 @@ for i in range(num_points):
 plt.figure()
 plt.scatter(*zip(*pos_ve_t), color='red')
 plt.scatter(*zip(*neg_ve_t), color='blue')
-
-
+plotContour(Xs, Ts, C2, Ls2, b2)
