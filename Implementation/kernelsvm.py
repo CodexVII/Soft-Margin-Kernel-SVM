@@ -228,25 +228,25 @@ print "Overall accuracy %.2f%%" %(accuracy)
 ##
 x1_t = []     ## stores x
 x2_t = []     ## stores y
-Ts = []     ## desired output of training set
+Ts_t = []     ## desired output of training set
 with open('testing-dataset-aut-2016.txt') as f:
     for line in f:
         data = line.split()
         x1_t.append(float(data[0]))
         x2_t.append(float(data[1]))
-        Ts.append(int(data[2]))
+        Ts_t.append(int(data[2]))
         
 
 ## Place x1 and x2 into the single Xs list
 num_points = len(x1)
-Xs = num_points*[None]     ## training set
+Xs_t = num_points*[None]     ## training set
 for i in range(num_points):
-    Xs[i]=[x1_t[i],x2_t[i]]
+    Xs_t[i]=[x1_t[i],x2_t[i]]
     
 ## Test set with C=1 sigma^2=0.15
 #
 print "\n\nAttempting to generate LMs for test set using rbf kernel with C=1 sigma^2=0.15"
-passed,missed,fn,fp = testClassifier(Xs,Ts,C1,Ls1,b1,K=rbf2)
+passed,missed,fn,fp = testClassifier(Xs_t,Ts_t,C1,Ls1,b1,K=rbf2)
 accuracy=((float(num_points)-missed)/float(num_points))*100.0
 if passed:
     print "  Check PASSED"
@@ -258,7 +258,7 @@ print "Overall accuracy %.2f%%" %(accuracy)
 ## Test set with C=1e6 sigma^2=0.15
 #
 print "\n\nAttempting to generate LMs for test set using rbf kernel with C=1e6 sigma^2=0.15"
-passed,missed,fn,fp = testClassifier(Xs,Ts,C2,Ls2,b2,K=rbf2)
+passed,missed,fn,fp = testClassifier(Xs_t,Ts_t,C2,Ls2,b2,K=rbf2)
 accuracy=((float(num_points)-missed)/float(num_points))*100.0
 if passed:
     print "  Check PASSED"
@@ -282,10 +282,10 @@ print "Overall accuracy %.2f%%" %(accuracy)
 ## xx, yy = meshgrid(x, y, sparse=True)
 ## z = np.sin(xx**2 + yy**2) / (xx**2 + yy**2)
 ## 
-def plotContour(Xs, Ts, C, Ls, b):
+def plotContour(Xs, Ts, C, Ls, b, filled=False):
     # prepare the x,y coords
-    x = np.arange(-1,3.5,0.001)
-    y = np.arange(-1.5,2.5,0.001)    
+    x = np.arange(-1,3.5,0.01)
+    y = np.arange(-1.5,2.5,0.01)  
     xx,yy = np.meshgrid(x,y)
         
     
@@ -297,9 +297,12 @@ def plotContour(Xs, Ts, C, Ls, b):
     
     for i in range(columns):
         for j in range(rows):
-            z[j,i] = classify(array([x[i],y[j]]).tolist(), Xs, Ts, C, Ls, b, verbose=False)
+            z[j,i] = classify(([x[i],y[j]]), Xs, Ts, C, Ls, b, verbose=False)
   
-    plt.contour(xx,yy,z)
+    if filled == False:
+        plt.contour(xx,yy,z)
+    else:
+        plt.contourf(xx,yy,z)
     return xx,yy,z
    
 ## Organise training data to classifications
@@ -311,11 +314,35 @@ for i in range(num_points):
     else:
         neg_ve.append([x1[i],x2[i]])
         
-plt.figure()
+## training set contour plots
+fig=plt.figure()
+X1,Y1,Z1=plotContour(Xs, Ts, C1, Ls1, b1)
 plt.scatter(*zip(*pos_ve), color='red')
 plt.scatter(*zip(*neg_ve), color='blue')
-X1,Y1,Z1=plotContour(Xs, Ts, C1, Ls1, b1)
+fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1 Sigma^2=0.15")
 savefig('Training Set C1')
+
+fig=plt.figure()
+plt.scatter(*zip(*pos_ve), color='red')
+plt.scatter(*zip(*neg_ve), color='blue')
+plotContour(Xs, Ts, C2, Ls2, b2)
+fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1e6 Sigma^2=0.15")
+savefig('Training Set C2')
+
+## trainng set filled contour plots
+fig=plt.figure()
+X1,Y1,Z1=plotContour(Xs, Ts, C1, Ls1, b1, filled=True)
+plt.scatter(*zip(*pos_ve), color='red')
+plt.scatter(*zip(*neg_ve), color='blue')
+fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1 Sigma^2=0.15")
+savefig('Training Set C1 (Filled)')
+
+fig=plt.figure()
+plotContour(Xs, Ts, C2, Ls2, b2, filled=True)
+plt.scatter(*zip(*pos_ve), color='red')
+plt.scatter(*zip(*neg_ve), color='blue')
+fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1e6 Sigma^2=0.15")
+savefig('Training Set C2 (Filled)')
 
 ## Organise testing data to classifications
 pos_ve_t = []     ## stores class 1 data
@@ -325,8 +352,33 @@ for i in range(num_points):
         pos_ve_t.append([x1_t[i],x2_t[i]])
     else:
         neg_ve_t.append([x1_t[i],x2_t[i]])
-plt.figure()
+
+## testing set contour plots
+fig=plt.figure()
+plotContour(Xs_t, Ts_t, C1, Ls1, b1)
 plt.scatter(*zip(*pos_ve_t), color='red')
 plt.scatter(*zip(*neg_ve_t), color='blue')
-plotContour(Xs, Ts, C1, Ls1, b1)
+fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1 Sigma^2=0.15")
 savefig('Testing set C1')
+
+fig=plt.figure()
+plotContour(Xs_t, Ts_t, C2, Ls2, b2)
+plt.scatter(*zip(*pos_ve), color='red')
+plt.scatter(*zip(*neg_ve), color='blue')
+fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1e6 Sigma^2=0.15")
+savefig('Testing Set C2')
+
+## testing set filled contour plots
+fig=plt.figure()
+X1,Y1,Z1=plotContour(Xs_t, Ts_t, C1, Ls1, b1, filled=True)
+plt.scatter(*zip(*pos_ve), color='red')
+plt.scatter(*zip(*neg_ve), color='blue')
+fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1 Sigma^2=0.15")
+savefig('Testing Set C1 (Filled)')
+
+fig=plt.figure()
+plotContour(Xs_t, Ts_t, C2, Ls2, b2, filled=True)
+plt.scatter(*zip(*pos_ve), color='red')
+plt.scatter(*zip(*neg_ve), color='blue')
+fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1e6 Sigma^2=0.15")
+savefig('Testing Set C2 (Filled)')
