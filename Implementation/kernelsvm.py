@@ -102,7 +102,24 @@ def classify(x,Xs,Ts,C=1,Ls=None,b=None,K=rbf2,verbose=True):
     elif y < 0.0: return -1
     else: return 0 
 
+def getActivation(x,Xs,Ts,C=1,Ls=None,b=None,K=rbf2,verbose=True):
+    "Classify an input x into {-1,+1} given support vectors, outputs and L." 
+    ## No Lagrange multipliers supplied, generate them.
+    if Ls == None:
+        status,Ls = makeLambdas(Xs,Ts,C)
+        ## If Ls generation failed (non-seperable problem) throw exception
+        if status != "optimal": raise Exception("Can't find Lambdas")
+    ## Calculate bias as average over all support vectors (non-zero
+    ## Lagrange multipliers.
+    if b == None:  b = makeB(Xs,Ts,C,Ls,K)
+    ## Do classification.  y is the "activation level".
+    y = b
+    for n in range(len(Ts)):
+        if Ls[n] >= 1e-10:
+            y += Ls[n] * Ts[n] * K(Xs[n],x)
 
+    return y
+    
 def testClassifier(Xs,Ts,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
     "Test a classifier specifed by Lagrange mults, bias and kernel on all Xs/Ts pairs."
     assert len(Xs) == len(Ts)
@@ -282,13 +299,26 @@ print "Overall accuracy %.2f%%" %(accuracy)
 ## xx, yy = meshgrid(x, y, sparse=True)
 ## z = np.sin(xx**2 + yy**2) / (xx**2 + yy**2)
 ## 
-def plotContour(Xs, Ts, C, Ls, b, filled=False):
+def plotContour(Xs, Ts, C, Ls, b, pos_ve, neg_ve, title, filled=False):
+    plt.figure()
+#
+#    ## seperate x and y values
+#    x_coords = [item[0] for item in Xs]
+#    y_coords = [item[1] for item in Xs]
+#    
+#    ## find limits of the meshgrid
+#    x_min, x_max = min(x_coords)-1, max(x_coords)+1
+#    y_min, y_max = min(y_coords)-1, max(y_coords)+1
+#    
+#    print(x_min, x_max)
+#    print(y_min, y_max)
+    ## Contour section
     # prepare the x,y coords
-    x = np.arange(-1,3.5,0.01)
-    y = np.arange(-1.5,2.5,0.01)  
+    step=0.2
+    x = np.arange(-1.5,3.6,step)
+    y = np.arange(-1.5,3.6,step)  
     xx,yy = np.meshgrid(x,y)
-        
-    
+            
     rows = len(y)
     columns = len(x)
     # fill up z which classifies each xx and yy
@@ -297,12 +327,18 @@ def plotContour(Xs, Ts, C, Ls, b, filled=False):
     
     for i in range(columns):
         for j in range(rows):
-            z[j,i] = classify(([x[i],y[j]]), Xs, Ts, C, Ls, b, verbose=False)
-  
+            z[j,i] = getActivation(([x[i],y[j]]), Xs, Ts, C, Ls, b, verbose=False)
+    
     if filled == False:
-        plt.contour(xx,yy,z)
+        plt.contour(xx,yy,z,levels=[-0.5,0,0.5], colors=['b','g','r'])
     else:
-        plt.contourf(xx,yy,z)
+        plt.contourf(xx,yy,z,alpha=0.5)
+        
+    ## Points section
+    plt.scatter(*zip(*pos_ve), color='red')
+    plt.scatter(*zip(*neg_ve), color='blue')
+    plt.title(title)
+#    savefig('Training Set C1',dpi=1000)    
     return xx,yy,z
    
 ## Organise training data to classifications
@@ -315,70 +351,27 @@ for i in range(num_points):
         neg_ve.append([x1[i],x2[i]])
         
 ## training set contour plots
-fig=plt.figure()
-X1,Y1,Z1=plotContour(Xs, Ts, C1, Ls1, b1)
-plt.scatter(*zip(*pos_ve), color='red')
-plt.scatter(*zip(*neg_ve), color='blue')
-fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1 Sigma^2=0.15")
-savefig('Training Set C1')
-
-fig=plt.figure()
-plt.scatter(*zip(*pos_ve), color='red')
-plt.scatter(*zip(*neg_ve), color='blue')
-plotContour(Xs, Ts, C2, Ls2, b2)
-fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1e6 Sigma^2=0.15")
-savefig('Training Set C2')
+plotContour(Xs, Ts, C1, Ls1, b1, pos_ve, neg_ve,title="Soft-Margin RBF SVM Training Set C=1 Sigma^2=0.15")
+plotContour(Xs, Ts, C2, Ls2, b2, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1e6 Sigma^2=0.15")
 
 ## trainng set filled contour plots
-fig=plt.figure()
-X1,Y1,Z1=plotContour(Xs, Ts, C1, Ls1, b1, filled=True)
-plt.scatter(*zip(*pos_ve), color='red')
-plt.scatter(*zip(*neg_ve), color='blue')
-fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1 Sigma^2=0.15")
-savefig('Training Set C1 (Filled)')
-
-fig=plt.figure()
-plotContour(Xs, Ts, C2, Ls2, b2, filled=True)
-plt.scatter(*zip(*pos_ve), color='red')
-plt.scatter(*zip(*neg_ve), color='blue')
-fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1e6 Sigma^2=0.15")
-savefig('Training Set C2 (Filled)')
+plotContour(Xs, Ts, C1, Ls1, b1, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1 Sigma^2=0.15",filled=True)
+plotContour(Xs, Ts, C2, Ls2, b2, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1e6 Sigma^2=0.15",filled=True)
 
 ## Organise testing data to classifications
 pos_ve_t = []     ## stores class 1 data
 neg_ve_t = []     ## stores class 2 data
 for i in range(num_points):
-    if Ts[i] == 1:
+    if Ts_t[i] == 1:
         pos_ve_t.append([x1_t[i],x2_t[i]])
     else:
         neg_ve_t.append([x1_t[i],x2_t[i]])
 
 ## testing set contour plots
-fig=plt.figure()
-plotContour(Xs_t, Ts_t, C1, Ls1, b1)
-plt.scatter(*zip(*pos_ve_t), color='red')
-plt.scatter(*zip(*neg_ve_t), color='blue')
-fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1 Sigma^2=0.15")
-savefig('Testing set C1')
-
-fig=plt.figure()
-plotContour(Xs_t, Ts_t, C2, Ls2, b2)
-plt.scatter(*zip(*pos_ve), color='red')
-plt.scatter(*zip(*neg_ve), color='blue')
-fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1e6 Sigma^2=0.15")
-savefig('Testing Set C2')
+plotContour(Xs, Ts, C1, Ls1, b1, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1 Sigma^2=0.15")
+plotContour(Xs, Ts, C2, Ls2, b2, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1e6 Sigma^2=0.15")
 
 ## testing set filled contour plots
-fig=plt.figure()
-X1,Y1,Z1=plotContour(Xs_t, Ts_t, C1, Ls1, b1, filled=True)
-plt.scatter(*zip(*pos_ve), color='red')
-plt.scatter(*zip(*neg_ve), color='blue')
-fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1 Sigma^2=0.15")
-savefig('Testing Set C1 (Filled)')
+plotContour(Xs, Ts, C1, Ls1, b1, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1 Sigma^2=0.15",filled=True)
+plotContour(Xs, Ts, C2, Ls2, b2, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1e6 Sigma^2=0.15",filled=True)
 
-fig=plt.figure()
-plotContour(Xs_t, Ts_t, C2, Ls2, b2, filled=True)
-plt.scatter(*zip(*pos_ve), color='red')
-plt.scatter(*zip(*neg_ve), color='blue')
-fig.suptitle("Soft-Margin RBF SVM Trainng Set C=1e6 Sigma^2=0.15")
-savefig('Testing Set C2 (Filled)')
