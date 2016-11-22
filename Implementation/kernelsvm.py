@@ -1,5 +1,6 @@
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.colors as clr
 from  matplotlib.pyplot import savefig
 from math import exp
 from numpy import array
@@ -55,7 +56,7 @@ def makeLambdas(Xs,Ts,C,K=rbfKernel):
 
 
 
-def makeB(Xs,Ts,C=1,Ls=None,K=rbfKernel):
+def makeB(Xs,Ts,C=1,Ls=None,K=rbf2):
     "Generate the bias given Xs, Ts and (optionally) Ls and K"
     ## No Lagrange multipliers supplied, generate them.
     if Ls == None:
@@ -71,13 +72,13 @@ def makeB(Xs,Ts,C=1,Ls=None,K=rbfKernel):
             sv_count += 1
             b_sum += Ts[n]
             for i in range(len(Ts)):
-                if Ls[i] >= 1e-10 and Ls[n] < C:
+                if Ls[i] >= 1e-10 and Ls[i] < C:
                     b_sum -= Ls[i] * Ts[i] * K(Xs[i],Xs[n])
             
     return b_sum/sv_count
 
 
-def classify(x,Xs,Ts,C=1,Ls=None,b=None,K=rbf2,verbose=True):
+def classify(x,Xs,Ts,C=1,Ls=None,b=None,K=rbf2,verbose=True,activation_get=False):
     "Classify an input x into {-1,+1} given support vectors, outputs and L." 
     ## No Lagrange multipliers supplied, generate them.
     if Ls == None:
@@ -98,27 +99,13 @@ def classify(x,Xs,Ts,C=1,Ls=None,b=None,K=rbf2,verbose=True):
         if y > 0.0: print "+1"
         elif y < 0.0: print "-1"
         else: print "0  (ERROR)"
-    if y > 0.0: return +1
-    elif y < 0.0: return -1
-    else: return 0 
-
-def getActivation(x,Xs,Ts,C=1,Ls=None,b=None,K=rbf2,verbose=True):
-    "Classify an input x into {-1,+1} given support vectors, outputs and L." 
-    ## No Lagrange multipliers supplied, generate them.
-    if Ls == None:
-        status,Ls = makeLambdas(Xs,Ts,C)
-        ## If Ls generation failed (non-seperable problem) throw exception
-        if status != "optimal": raise Exception("Can't find Lambdas")
-    ## Calculate bias as average over all support vectors (non-zero
-    ## Lagrange multipliers.
-    if b == None:  b = makeB(Xs,Ts,C,Ls,K)
-    ## Do classification.  y is the "activation level".
-    y = b
-    for n in range(len(Ts)):
-        if Ls[n] >= 1e-10:
-            y += Ls[n] * Ts[n] * K(Xs[n],x)
-
-    return y
+    
+    if activation_get==True:
+        return y
+    else:
+        if y > 0.0: return +1
+        elif y < 0.0: return -1
+        else: return 0 
     
 def testClassifier(Xs,Ts,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
     "Test a classifier specifed by Lagrange mults, bias and kernel on all Xs/Ts pairs."
@@ -300,45 +287,63 @@ print "Overall accuracy %.2f%%" %(accuracy)
 ## z = np.sin(xx**2 + yy**2) / (xx**2 + yy**2)
 ## 
 def plotContour(Xs, Ts, C, Ls, b, pos_ve, neg_ve, title, filled=False):
-    plt.figure()
-#
-#    ## seperate x and y values
-#    x_coords = [item[0] for item in Xs]
-#    y_coords = [item[1] for item in Xs]
-#    
-#    ## find limits of the meshgrid
-#    x_min, x_max = min(x_coords)-1, max(x_coords)+1
-#    y_min, y_max = min(y_coords)-1, max(y_coords)+1
-#    
-#    print(x_min, x_max)
-#    print(y_min, y_max)
+    plt.figure()    
+    
+    ## sort out misclassifications to correct data
+    miss_pos_ve=[]
+    corr_pos_ve=[]
+    miss_neg_ve=[]
+    corr_neg_ve=[]
+    for i in range(len(pos_ve)):
+        if classify(pos_ve[i], Xs, Ts, C, Ls, b, verbose=False) == -1:
+            miss_pos_ve.append(pos_ve[i])
+        else:
+            corr_pos_ve.append(pos_ve[i])
+        if classify(neg_ve[i], Xs, Ts, C, Ls, b, verbose=False) == 1:
+            miss_neg_ve.append(neg_ve[i])
+        else:
+            corr_neg_ve.append(neg_ve[i])
+    
+    print(miss_pos_ve)
     ## Contour section
     # prepare the x,y coords
     step=0.2
-    x = np.arange(-1.5,3.6,step)
-    y = np.arange(-1.5,3.6,step)  
+    x = np.arange(-1.5,4,step)
+    y = np.arange(-1.9,3.5,step)  
     xx,yy = np.meshgrid(x,y)
             
     rows = len(y)
     columns = len(x)
+    
     # fill up z which classifies each xx and yy
     z = np.ndarray(shape=(rows,columns)) 
     
-    
+    # store activation levels in the 2-D Z array
     for i in range(columns):
         for j in range(rows):
-            z[j,i] = getActivation(([x[i],y[j]]), Xs, Ts, C, Ls, b, verbose=False)
+            z[j,i] = classify(([x[i],y[j]]), Xs, Ts, C, Ls, b, verbose=False, activation_get=True)
+    
     
     if filled == False:
-        plt.contour(xx,yy,z,levels=[-0.5,0,0.5], colors=['b','g','r'])
+        plt.contour(xx,yy,z,levels=[-1,0,1], colors=['b','g','r'])
     else:
-        plt.contourf(xx,yy,z,alpha=0.5)
+        plt.contour(xx,yy,z,levels=[-1,0,1], colors=['b','g','r'])
+        cmap = clr.ListedColormap(['b','r'])
+        plt.contourf(xx,yy,z,0, cmap=cmap,alpha=0.2)
         
     ## Points section
-    plt.scatter(*zip(*pos_ve), color='red')
-    plt.scatter(*zip(*neg_ve), color='blue')
+#    plt.scatter(*zip(*pos_ve), color='red')
+#    plt.scatter(*zip(*neg_ve), color='blue')
+    plt.scatter(*zip(*corr_pos_ve), color='red')
+    plt.scatter(*zip(*corr_neg_ve), color='blue')
+    if len(miss_pos_ve) != 0:
+        plt.scatter(*zip(*miss_pos_ve), color='m')
+    if len(miss_pos_ve) != 0:    
+        plt.scatter(*zip(*miss_neg_ve), color='c')
     plt.title(title)
-#    savefig('Training Set C1',dpi=1000)    
+    
+        
+   # savefig(title+'.png',dpi=500)    
     return xx,yy,z
    
 ## Organise training data to classifications
@@ -355,8 +360,8 @@ plotContour(Xs, Ts, C1, Ls1, b1, pos_ve, neg_ve,title="Soft-Margin RBF SVM Train
 plotContour(Xs, Ts, C2, Ls2, b2, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1e6 Sigma^2=0.15")
 
 ## trainng set filled contour plots
-plotContour(Xs, Ts, C1, Ls1, b1, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1 Sigma^2=0.15",filled=True)
-plotContour(Xs, Ts, C2, Ls2, b2, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1e6 Sigma^2=0.15",filled=True)
+plotContour(Xs, Ts, C1, Ls1, b1, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1 Sigma^2=0.15 (Filled)",filled=True)
+plotContour(Xs, Ts, C2, Ls2, b2, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1e6 Sigma^2=0.15 (Filled)",filled=True)
 
 ## Organise testing data to classifications
 pos_ve_t = []     ## stores class 1 data
@@ -372,6 +377,6 @@ plotContour(Xs, Ts, C1, Ls1, b1, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM 
 plotContour(Xs, Ts, C2, Ls2, b2, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1e6 Sigma^2=0.15")
 
 ## testing set filled contour plots
-plotContour(Xs, Ts, C1, Ls1, b1, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1 Sigma^2=0.15",filled=True)
-plotContour(Xs, Ts, C2, Ls2, b2, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1e6 Sigma^2=0.15",filled=True)
+plotContour(Xs, Ts, C1, Ls1, b1, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1 Sigma^2=0.15 (Filled)",filled=True)
+plotContour(Xs, Ts, C2, Ls2, b2, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1e6 Sigma^2=0.15 (Filled)",filled=True)
 
