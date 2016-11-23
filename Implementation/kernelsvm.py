@@ -355,7 +355,7 @@ def plotContour(Xs, Ts, C, Ls, b, pos_ve, neg_ve, title, filled=False):
     
     ## Contour section
     # prepare the x,y coords
-    step=0.2
+    step=0.01
     x = np.arange(-1.5,4,step)
     y = np.arange(-1.9,3.5,step)  
     xx,yy = np.meshgrid(x,y)

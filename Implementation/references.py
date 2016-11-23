@@ -290,6 +290,10 @@
 
 from cvxopt import matrix,solvers
 from math import exp
+import numpy as np
+from numpy import array
+import matplotlib as plt
+
 
 
 ##--------------------------------------------------------------------------
@@ -739,6 +743,27 @@ if statv2 == 'optimal':
         print "  Check PASSED"
     else:
         print "  Check FAILED: Classifier does not work corectly on training inputs"
-        
 
+def plotContour(Xs, Ts, C, Ls, b):
+    # prepare the x,y coords
+    x = np.arange(-1,3.5,0.05)
+    y = np.arange(-1.5,2.5,0.05)    
+    xx,yy = np.meshgrid(x,y)
+        
+    
+    rows = len(y)
+    columns = len(x)
+    # fill up z which classifies each xx and yy
+    z = np.ndarray(shape=(rows,columns)) 
+    
+    
+    for i in range(columns):
+        for j in range(rows):
+            z[j,i] = classify(array([x[i],y[j]]).tolist(), Xs, Ts, C, Ls, b, verbose=False)
+  
+    plt.contour(xx,yy,z)
+    return xx,yy,z
+
+      
+plotContour(Xs, Tsv2, 0.5, Lsv2, bv2 )
 
