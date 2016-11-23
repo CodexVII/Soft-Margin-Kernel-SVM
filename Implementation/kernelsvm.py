@@ -106,8 +106,9 @@ def classify(x,Xs,Ts,C=1,Ls=None,b=None,K=rbf2,verbose=True,activation_get=False
         if y > 0.0: return +1
         elif y < 0.0: return -1
         else: return 0 
-    
-def testClassifier(Xs,Ts,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
+
+
+def testClassifier(Xs,Ts,Xs_train=None,Ts_train=None,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
     "Test a classifier specifed by Lagrange mults, bias and kernel on all Xs/Ts pairs."
     assert len(Xs) == len(Ts)
     ## No Ls supplied, generate them.
@@ -126,20 +127,35 @@ def testClassifier(Xs,Ts,C=1,Ls=None,b=None,K=rbfKernel,verbose=True):
     missed = 0
     fn = 0
     fp = 0
-    for i in range(len(Xs)):
-        c = classify(Xs[i],Xs,Ts,C,Ls,b,K=K)    #possibly needs to be modified
-        if c != Ts[i]:
-            missed += 1
-            if c == 1 and Ts[i] == -1:
-                fp += 1
-            elif c == -1 and Ts[i] == 1:
-                fn += 1
-            if verbose:
-                print "Misclassification: input %s, output %d, expected %d" %\
-                      (Xs[i],c,Ts[i])
-            good = False
+    
+    # if SVM is already trained then use those values to classify
+    if Xs_train != None and Ts_train != None:
+        for i in range(len(Xs)):       
+            c = classify(Xs[i],Xs_train,Ts_train,C,Ls,b,K=K)    
+            if c != Ts[i]:
+                missed += 1
+                if c == 1 and Ts[i] == -1:
+                    fp += 1
+                elif c == -1 and Ts[i] == 1:
+                    fn += 1
+                if verbose:
+                    print "Misclassification: input %s, output %d, expected %d" %\
+                          (Xs[i],c,Ts[i])
+                good = False
+    else:
+        for i in range(len(Xs)):
+            c = classify(Xs[i],Xs,Ts,C,Ls,b,K=K)    
+            if c != Ts[i]:
+                missed += 1
+                if c == 1 and Ts[i] == -1:
+                    fp += 1
+                elif c == -1 and Ts[i] == 1:
+                    fn += 1
+                if verbose:
+                    print "Misclassification: input %s, output %d, expected %d" %\
+                          (Xs[i],c,Ts[i])
+                good = False
     return good, missed, fn, fp
-
 
 ##--------------------------------------------------------------------------
 ##
@@ -196,7 +212,7 @@ print "\n\nAttempting to generate LMs for training test using rbf kernel with C=
 status,Ls1=makeLambdas(Xs,Ts,C1,K=rbf2)
 if status == 'optimal':
     b1=makeB(Xs,Ts,C1,Ls1,K=rbf2)
-    passed,missed,fn,fp = testClassifier(Xs,Ts,C1,Ls1,b1,K=rbf2)
+    passed,missed,fn,fp = testClassifier(Xs,Ts,C=C1,Ls=Ls1,b=b1,K=rbf2)
     accuracy=((float(num_points)-missed)/float(num_points))*100.0
     if passed:
         print "  Check PASSED"
@@ -213,7 +229,7 @@ print "\n\nAttempting to generate LMs for training test using rbf kernel with C=
 status,Ls2=makeLambdas(Xs,Ts,C2,K=rbf2)
 if status == 'optimal':
     b2=makeB(Xs,Ts,C2,Ls2,K=rbf2)
-    passed,missed,fn,fp = testClassifier(Xs,Ts,C2,Ls2,b2,K=rbf2)
+    passed,missed,fn,fp = testClassifier(Xs,Ts,C=C2,Ls=Ls2,b=b2,K=rbf2)
     accuracy=((float(num_points)-missed)/float(num_points))*100.0
     if passed:
         print "  Check PASSED"
@@ -250,7 +266,7 @@ for i in range(num_points):
 ## Test set with C=1 sigma^2=0.15
 #
 print "\n\nAttempting to generate LMs for test set using rbf kernel with C=1 sigma^2=0.15"
-passed,missed,fn,fp = testClassifier(Xs_t,Ts_t,C1,Ls1,b1,K=rbf2)
+passed,missed,fn,fp = testClassifier(Xs_t,Ts_t,Xs,Ts,C1,Ls1,b1,K=rbf2)
 accuracy=((float(num_points)-missed)/float(num_points))*100.0
 if passed:
     print "  Check PASSED"
@@ -262,7 +278,7 @@ print "Overall accuracy %.2f%%" %(accuracy)
 ## Test set with C=1e6 sigma^2=0.15
 #
 print "\n\nAttempting to generate LMs for test set using rbf kernel with C=1e6 sigma^2=0.15"
-passed,missed,fn,fp = testClassifier(Xs_t,Ts_t,C2,Ls2,b2,K=rbf2)
+passed,missed,fn,fp = testClassifier(Xs_t,Ts_t,Xs,Ts,C2,Ls2,b2,K=rbf2)
 accuracy=((float(num_points)-missed)/float(num_points))*100.0
 if passed:
     print "  Check PASSED"
@@ -287,7 +303,8 @@ print "Overall accuracy %.2f%%" %(accuracy)
 ## z = np.sin(xx**2 + yy**2) / (xx**2 + yy**2)
 ## 
 def plotContour(Xs, Ts, C, Ls, b, pos_ve, neg_ve, title, filled=False):
-    plt.figure()    
+   # plt.figure(figsize=(6,5))    
+    plt.figure()
     
     ## sort out misclassifications to correct data
     miss_pos_ve=[]
@@ -304,7 +321,6 @@ def plotContour(Xs, Ts, C, Ls, b, pos_ve, neg_ve, title, filled=False):
         else:
             corr_neg_ve.append(neg_ve[i])
     
-    print(miss_pos_ve)
     ## Contour section
     # prepare the x,y coords
     step=0.2
@@ -332,20 +348,19 @@ def plotContour(Xs, Ts, C, Ls, b, pos_ve, neg_ve, title, filled=False):
         plt.contourf(xx,yy,z,0, cmap=cmap,alpha=0.2)
         
     ## Points section
-#    plt.scatter(*zip(*pos_ve), color='red')
-#    plt.scatter(*zip(*neg_ve), color='blue')
-    plt.scatter(*zip(*corr_pos_ve), color='red')
-    plt.scatter(*zip(*corr_neg_ve), color='blue')
+    marker_size=10
+    line_width=.5
+    plt.scatter(*zip(*corr_pos_ve),s=marker_size, color='r', edgecolor='black', linewidth=line_width)
+    plt.scatter(*zip(*corr_neg_ve),s=marker_size, color='b',edgecolor='black', linewidth=line_width)
     if len(miss_pos_ve) != 0:
-        plt.scatter(*zip(*miss_pos_ve), color='m')
+        plt.scatter(*zip(*miss_pos_ve),s=marker_size,color='r',  marker='D',edgecolor='black', linewidth=line_width)
     if len(miss_pos_ve) != 0:    
-        plt.scatter(*zip(*miss_neg_ve), color='c')
+        plt.scatter(*zip(*miss_neg_ve),s=marker_size,color='b', marker='D',edgecolor='black', linewidth=line_width)
     plt.title(title)
     
         
-   # savefig(title+'.png',dpi=500)    
-    return xx,yy,z
-   
+    savefig(title+'.png',dpi=1000)    
+    
 ## Organise training data to classifications
 pos_ve = []     ## stores class 1 data
 neg_ve = []     ## stores class 2 data
