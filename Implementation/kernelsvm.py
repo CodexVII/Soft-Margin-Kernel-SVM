@@ -122,8 +122,7 @@ def testClassifier(Xs,Ts,Xs_train=None,Ts_train=None,C=1,Ls=None,b=None,K=rbfKer
     if b == None:
         b = makeB(Xs,Ts,C,Ls,K)
         print "Bias:",b
-    ## Do classification test.
-    good = True
+    ## Do classification test
     missed = 0
     fn = 0
     fp = 0
@@ -141,7 +140,6 @@ def testClassifier(Xs,Ts,Xs_train=None,Ts_train=None,C=1,Ls=None,b=None,K=rbfKer
                 if verbose:
                     print "Misclassification: input %s, output %d, expected %d" %\
                           (Xs[i],c,Ts[i])
-                good = False
     else:
         for i in range(len(Xs)):
             c = classify(Xs[i],Xs,Ts,C,Ls,b,K=K)    
@@ -154,8 +152,7 @@ def testClassifier(Xs,Ts,Xs_train=None,Ts_train=None,C=1,Ls=None,b=None,K=rbfKer
                 if verbose:
                     print "Misclassification: input %s, output %d, expected %d" %\
                           (Xs[i],c,Ts[i])
-                good = False
-    return good, missed, fn, fp
+    return missed, fn, fp
 
 ##--------------------------------------------------------------------------
 ##
@@ -178,6 +175,36 @@ def makeP(xs,ts,K):
     return P
 
 
+
+##--------------------------------------------------------------------------
+##
+##  Result data storage
+##
+##--------------------------------------------------------------------------
+##
+missed=[]
+false_neg=[]
+false_pos=[]
+accuracy=[]
+
+def storeResults(miss,fn,fp,acc):
+    missed.append(miss)    
+    false_neg.append(fn)
+    false_pos.append(fp)
+    accuracy.append(acc)
+
+def reportResults():
+    print "\nREPORTING OVERALL PERFORMANCE"    
+    c=[1,1e6]
+    for i in range(2):
+        print '   Training Set C={0}'.format(c[i])
+        print """   Missed={0}. Accuracy={1}%. False Negative(s)={2}. False Positive(s)={3}
+        """.format(missed[i],accuracy[i], false_neg[i], false_pos[i])
+    for i in range(2):
+        print '   Testing Set C={0}'.format(c[i])
+        print """   Missed={0}. Accuracy={1}%. False Negative(s)={2}. False Positive(s)={3}
+        """.format(missed[i+2],accuracy[i+2], false_neg[i+2], false_pos[i+2])
+            
 ##--------------------------------------------------------------------------
 ##
 ##  Working with the trainng set
@@ -212,15 +239,15 @@ print "\n\nAttempting to generate LMs for training test using rbf kernel with C=
 status,Ls1=makeLambdas(Xs,Ts,C1,K=rbf2)
 if status == 'optimal':
     b1=makeB(Xs,Ts,C1,Ls1,K=rbf2)
-    passed,missed,fn,fp = testClassifier(Xs,Ts,C=C1,Ls=Ls1,b=b1,K=rbf2)
-    accuracy=((float(num_points)-missed)/float(num_points))*100.0
-    if passed:
-        print "  Check PASSED"
-    else:
-        print "  Check FAILED: Classifier does not work corectly on training inputs"
-print "Total of %d misclassification(s)." %(missed)
+    miss,fn,fp = testClassifier(Xs,Ts,C=C1,Ls=Ls1,b=b1,K=rbf2)
+    acc=((float(num_points)-miss)/float(num_points))*100.0
+    
+    #store results
+    storeResults(miss,fn,fp,acc)
+    
+print "Total of %d misclassification(s)." %(miss)
 print "False Positive(s): %d, False Negative(s): %d" %(fn, fp) 
-print "Overall accuracy %.2f%%" %(accuracy)
+print "Overall accuracy %.2f%%" %(acc)
     
 # Training set with C=1e6 sigma^2=0.15
 
@@ -229,15 +256,15 @@ print "\n\nAttempting to generate LMs for training test using rbf kernel with C=
 status,Ls2=makeLambdas(Xs,Ts,C2,K=rbf2)
 if status == 'optimal':
     b2=makeB(Xs,Ts,C2,Ls2,K=rbf2)
-    passed,missed,fn,fp = testClassifier(Xs,Ts,C=C2,Ls=Ls2,b=b2,K=rbf2)
-    accuracy=((float(num_points)-missed)/float(num_points))*100.0
-    if passed:
-        print "  Check PASSED"
-    else:
-        print "  Check FAILED: Classifier does not work corectly on training inputs"
-print "Total of %d misclassification(s)." %(missed)
+    miss,fn,fp = testClassifier(Xs,Ts,C=C2,Ls=Ls2,b=b2,K=rbf2)
+    acc=((float(num_points)-miss)/float(num_points))*100.0
+
+    #store results   
+    storeResults(miss,fn,fp,acc)
+    
+print "Total of %d misclassification(s)." %(miss)
 print "False Positive(s): %d, False Negative(s): %d" %(fn, fp) 
-print "Overall accuracy %.2f%%" %(accuracy)
+print "Overall accuracy %.2f%%" %(acc)
 
 ##--------------------------------------------------------------------------
 ##
@@ -266,25 +293,30 @@ for i in range(num_points):
 ## Test set with C=1 sigma^2=0.15
 #
 print "\n\nAttempting to generate LMs for test set using rbf kernel with C=1 sigma^2=0.15"
-passed,missed,fn,fp = testClassifier(Xs_t,Ts_t,Xs,Ts,C1,Ls1,b1,K=rbf2)
-accuracy=((float(num_points)-missed)/float(num_points))*100.0
-if passed:
-    print "  Check PASSED"
-print "Total of %d misclassification(s)." %(missed)
+miss,fn,fp = testClassifier(Xs_t,Ts_t,Xs,Ts,C1,Ls1,b1,K=rbf2)
+acc=((float(num_points)-miss)/float(num_points))*100.0
+
+# store results   
+storeResults(miss,fn,fp,acc)
+
+# report
+print "Total of %d misclassification(s)." %(miss)
 print "False Positive(s): %d, False Negative(s): %d" %(fn, fp) 
-print "Overall accuracy %.2f%%" %(accuracy)
+print "Overall accuracy %.2f%%" %(acc)
 
     
 ## Test set with C=1e6 sigma^2=0.15
 #
 print "\n\nAttempting to generate LMs for test set using rbf kernel with C=1e6 sigma^2=0.15"
-passed,missed,fn,fp = testClassifier(Xs_t,Ts_t,Xs,Ts,C2,Ls2,b2,K=rbf2)
-accuracy=((float(num_points)-missed)/float(num_points))*100.0
-if passed:
-    print "  Check PASSED"
-print "Total of %d misclassification(s)." %(missed)
+miss,fn,fp = testClassifier(Xs_t,Ts_t,Xs,Ts,C2,Ls2,b2,K=rbf2)
+acc=((float(num_points)-miss)/float(num_points))*100.0
+
+# store results   
+storeResults(miss,fn,fp,acc)
+
+print "Total of %d misclassification(s)." %(miss)
 print "False Positive(s): %d, False Negative(s): %d" %(fn, fp) 
-print "Overall accuracy %.2f%%" %(accuracy)
+print "Overall accuracy %.2f%%" %(acc)
 
 ##--------------------------------------------------------------------------
 ##
@@ -359,8 +391,8 @@ def plotContour(Xs, Ts, C, Ls, b, pos_ve, neg_ve, title, filled=False):
     plt.title(title)
     
         
-    savefig(title+'.png',dpi=1000)    
-    
+    #savefig(title+'.png',dpi=1000)    
+
 ## Organise training data to classifications
 pos_ve = []     ## stores class 1 data
 neg_ve = []     ## stores class 2 data
@@ -371,12 +403,12 @@ for i in range(num_points):
         neg_ve.append([x1[i],x2[i]])
         
 ## training set contour plots
-plotContour(Xs, Ts, C1, Ls1, b1, pos_ve, neg_ve,title="Soft-Margin RBF SVM Training Set C=1 Sigma^2=0.15")
-plotContour(Xs, Ts, C2, Ls2, b2, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1e6 Sigma^2=0.15")
+plotContour(Xs, Ts, C1, Ls1, b1, pos_ve, neg_ve,title="Training Set C=1, Sigma$^2$=0.15")
+plotContour(Xs, Ts, C2, Ls2, b2, pos_ve, neg_ve, title="Training Set C=1e6, Sigma^2=0.15")
 
 ## trainng set filled contour plots
-plotContour(Xs, Ts, C1, Ls1, b1, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1 Sigma^2=0.15 (Filled)",filled=True)
-plotContour(Xs, Ts, C2, Ls2, b2, pos_ve, neg_ve, title="Soft-Margin RBF SVM Training Set C=1e6 Sigma^2=0.15 (Filled)",filled=True)
+plotContour(Xs, Ts, C1, Ls1, b1, pos_ve, neg_ve, title="Training Set C=1, Sigma$^2$=0.15 (Filled)",filled=True)
+plotContour(Xs, Ts, C2, Ls2, b2, pos_ve, neg_ve, title="Training Set C=1e6, Sigma$^2$=0.15 (Filled)",filled=True)
 
 ## Organise testing data to classifications
 pos_ve_t = []     ## stores class 1 data
@@ -388,10 +420,11 @@ for i in range(num_points):
         neg_ve_t.append([x1_t[i],x2_t[i]])
 
 ## testing set contour plots
-plotContour(Xs, Ts, C1, Ls1, b1, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1 Sigma^2=0.15")
-plotContour(Xs, Ts, C2, Ls2, b2, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1e6 Sigma^2=0.15")
+plotContour(Xs, Ts, C1, Ls1, b1, pos_ve_t, neg_ve_t, title="Testing Set C=1, Sigma$^2$=0.15")
+plotContour(Xs, Ts, C2, Ls2, b2, pos_ve_t, neg_ve_t, title="Testing Set C=1e6, Sigma$^2$=0.15")
 
 ## testing set filled contour plots
-plotContour(Xs, Ts, C1, Ls1, b1, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1 Sigma^2=0.15 (Filled)",filled=True)
-plotContour(Xs, Ts, C2, Ls2, b2, pos_ve_t, neg_ve_t, title="Soft-Margin RBF SVM Testing Set C=1e6 Sigma^2=0.15 (Filled)",filled=True)
+plotContour(Xs, Ts, C1, Ls1, b1, pos_ve_t, neg_ve_t, title="Testing Set C=1, Sigma$^2$=0.15 (Filled)",filled=True)
+plotContour(Xs, Ts, C2, Ls2, b2, pos_ve_t, neg_ve_t, title="Testing Set C=1e6, Sigma$^2$=0.15 (Filled)",filled=True)
 
+reportResults()
